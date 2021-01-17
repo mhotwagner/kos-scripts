@@ -5,12 +5,12 @@ function gravity {
 	return -g.
 }
 
-function burnAlt {
+function getBurnAlt {
 	declare local parameter safety to 1.01.
 
 	declare local shipMass to ship:mass.
 	declare local verticalVelocity to ship:verticalspeed.
 	declare local verticalThurst to ((ship:maxThrust/shipMass) + gravity()).
-	declare local burnAlt to (verticalVelocity^2)/(2*verticalThurst).
-	return safety * burnAlt.
+	declare local _burnAlt to (verticalVelocity^2)/(2*verticalThurst).
+	return safety * _burnAlt.
 }

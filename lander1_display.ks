@@ -1,60 +1,25 @@
- //set displaySeparator to "+----------------------------------------+".
-set infoOffset to 9.
-
-function __printLines {
-	local parameter lines.
-	local parameter offset is 0.
-	from { local i to 0. }
-	until i = lines:length
-	step { set i to i + 1. }
-	do { print lines[i]() at (0, i + offset). }
-}
-
-function __clearDisplay {
-	local lines to list(
-		{ return "+----------------------------------------+". },
-		{ return "|           PROPULSIVE LANDER            |". },
-		{ return "+----------------------------------------+". },
-		{ return "| PHASE:                                 |". },
-		{ return "| ALTITUDE:                              |". },
-		{ return "| VELOCITY:                              |". },
-		{ return "| DELTA V:                               |". },
-		{ return "| TIME TO BURN:                          |". },
-		{ return "+----------------------------------------+". }
-	).
-	__printLines(lines).
-}
+run display_utils.
 
 function updateDisplay {
-	__clearDisplay().
-	local lines to list(
-		{ return "+----------------------------------------+". },
-		{ return "|           PROPULSIVE LANDER            |". },
-		{ return "+----------------------------------------+". },
-		{ return "| PHASE: " + state. },
-		{ return "| ALTITUDE: " + height + "m". },
-		{ return "| VELOCITY: " + descentV. },
-		{ return "| DELTA V: " + deltaV. },
-		{ return "| TIME TO BURN: " + timeToBurn. },
-		{ return "+----------------------------------------+". }
+	local parameter info is "".
+	local title to "PROPULSIVE LANDER".
+	local keys to list(
+		"PHASE",
+		"VERTICAL VELOCITY",
+		"CURRENT ALTITUDE",
+		"SURFACE ALT",
+		"BURN ALT",
+		"BURN DELTA-V",
+		"TIME TO BURN"
 	).
-	__printLines(lines).
-}
-
-function __clearInfo {
-	local lines to list(
-		{ return "| INFO:                                  |". },
-		{ return "+----------------------------------------+". }
+	local values to list(
+		 state,
+		 descentV,
+		 shipAlt,
+		 surfaceAlt,
+		 burnAlt,
+		 impactv(surfaceAlt),
+		 timeToBurn
 	).
-	__printLines(lines, infoOffset).
-}
-
-function updateInfo {
-	local parameter message is "".
-	set lines to list(
-		{ return "| INFO: " + message. },
-		{ return "+----------------------------------------+". }
-	).
-	__clearInfo().
-	__printLines(lines, infoOffset).
+	__updateDisplay(keys, values, title, info, 40).
 }

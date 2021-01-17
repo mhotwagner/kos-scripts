@@ -1,5 +1,7 @@
 clearscreen.
 
+declare parameter doautostage to false.
+
 set thrust to ship:maxThrust.
 set accel to thrust / ship:mass.
 set burnTime to nextnode:deltav:mag / accel.
@@ -11,6 +13,7 @@ lock steering to targetSteering.
 lock throttle to targetThrottle.
 
 run node1_display.
+run utils.
 
 set state_init to "INITIALIZING".
 set state_coasting to "COASTING".
@@ -70,6 +73,7 @@ states:add(state_burn, {
 		set state to state_finalize.
 		set once to false.
 	}
+	if (doautostage) { autostage(). }
 	updateInfo(vdot(initalDv, nextnode:deltav)).
 }).
 states:add(state_finalize, {

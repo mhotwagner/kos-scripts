@@ -26,7 +26,7 @@ run circa_display.
 
 set states to lexicon().
 states:add(state_init, {
-	set deltaV to getApoV() - getOrbitV(ship:apoapsis).
+	set deltaV to getApoV() - getCOV(ship:apoapsis).
 	set burnTime to deltaV / getA().
 	updateDisplay(info).
 	set state to state_coast.

@@ -26,7 +26,7 @@ run circp_display.
 
 set states to lexicon().
 states:add(state_init, {
-	set deltaV to getPeriV() - getOrbitV(ship:periapsis).
+	set deltaV to getPeriV() - getCOV(ship:periapsis).
 	set burnTime to deltaV / getA().
 	updateDisplay(info).
 	set state to state_coast.

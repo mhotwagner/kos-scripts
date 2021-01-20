@@ -81,11 +81,11 @@ states:add(state_burn, {
 	if not once { 
 		set info to "".
 		set once to true.
-		if ship:horizontalSpeed > 1 {
-			set state to state_horizontal_burn.
-			set once to false.
-			return.
-		}.
+		//if ship:horizontalSpeed > 1 {
+		//	set state to state_horizontal_burn.
+		//	set once to false.
+		//	return.
+		//}.
 	}
 	set steeringValue to srfretrograde.
 	if shipAlt < burnAlt + 2 {
@@ -102,13 +102,13 @@ states:add(state_burn, {
 	lock steering to steeringValue.
 	lock throttle to throttleValue.
 }).
-sates:add(state_horizontal_burn, {
-	if not once {
-		set info to "Nulling out horizontal speed".
-		set once to true.
-	}
-	set steering value to 
-}).
+//sates:add(state_horizontal_burn, {
+//	if not once {
+//		set info to "Nulling out horizontal speed".
+//		set once to true.
+//	}
+//	set steering value to 
+//}).
 states:add(state_landing, {
 	if not once { gear on. set once to true. }
 	local land to false.

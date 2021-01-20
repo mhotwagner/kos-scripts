@@ -43,7 +43,7 @@ states:add(state_coasting, {
 		updateInfo("Drifting through space...").
 		set once to true. set delayTick to 1.
 	}
-	if nextnode:eta <= (burnTime / 2) + 10 {
+	if nextnode:eta <= (burnTime / 2) + 60 {
 		set state to state_preBurn.
 		set delayTick to .1. set once to false.
 	}

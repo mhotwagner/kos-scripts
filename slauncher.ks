@@ -6,10 +6,12 @@ declare parameter orbitAltKm to 100.
 declare parameter rollAngle to 90.
 declare parameter manageMaxQ to true.
 declare parameter secondarySafetyAlt to 2000.
+declare parameter inFlight to false.
+
 declare parameter initialState to "PRE-LAUNCH".
 
 SET orbitAlt TO orbitAltKm * 1000.
-set orbitV to getOrbitV(orbitAlt).
+set orbitV to getCOV(orbitAlt).
 set safetyAlt to 300.
 
 sas off.
@@ -33,12 +35,12 @@ set state_turn_45 to "TURN TO 45 KM".
 set state_prepareCoast to "PREPARE TO COAST".
 set state_adjustApo to "ADJUST APOAPSIS".
 set state_coastToSpace to "COAST TO SPACE".
-set state_coastToApo to "COAST TO APOAPSIS".
+set state_coastToApo to "C".
 set state_prepareCirc to "PREPARE TO CIRCULARIIZE".
 set state_circ to "CIRCULARIIZE".
 set state_orbit to "ORBIT".
 
-set state to state_preLaunch.
+set state to choose state_climb2 if inFlight else state_preLaunch.
 set tickDelay to .01.
 set once to false.
 
@@ -139,11 +141,11 @@ states:add(state_coastToApo, {
 		updateInfo("Coasting to apoapsis").
 		panels on.
 		lights on.
-		set deltaV to (getOrbitV(ship:apoapsis) - getApoV()).
+		set deltaV to abs((getCOV(ship:apoapsis) - getApoV())).
 		set burnTime to deltaV / getA().
 	}
 	set targetSteering to up + r(0, -90, rollAngle).
-	if (eta:apoapsis - (burnTime / 2)) <  10 {
+	if (eta:apoapsis - (burnTime / 2)) <  60 {
 		set state to state_prepareCirc. set once to false.
 	}
 }).
@@ -153,9 +155,9 @@ states:add(state_prepareCirc, {
 			updateInfo("Preparing to circularize").
 			set once to true.
 		}
-		updateinfo( round(burnTime) + " s + " + round(deltaV) + "m/s burn in  " + round(eta:apoapsis - (burnTime/2)) + " seconds").
+		updateinfo( round(burnTime) + " s + " + round(deltaV) + "m/s burn in  " + round(eta:apoapsis - ((2 * burnTime) / 3)) + " seconds").
 		set targetSteering to up + r(0, -90, rollAngle).
-		if eta:apoapsis < (burnTime / 2) {
+		if eta:apoapsis < ((2 * burnTime) / 3) {
 			set state to state_circ. set once to false.
 		}
 }).
@@ -165,14 +167,17 @@ states:add(state_circ, { // 11: Circularize
 			set tickDelay to .01.
 			updateInfo("Circularizing").
 			lock throttle to 1.
+			//set lastE to ship:orbit:eccentricity.
+			//set moreCircular to true.
 		}
 		set targetSteering to up + r(0, -90, rollAngle).
 		if ship:periapsis > ship:apoapsis * .75 { lock throttle to .1. }
 		if ship:periapsis > ship:apoapsis * .95 { lock throttle to .05. }
-		if ship:periapsis > ship:apoapsis * .95 and ship:apoapsis > lastApo {
+		if ship:periapsis > orbitAlt * .95 and ship:apoapsis > orbitAlt * 1.05 {
 		  	set state to state_orbit. set once to false.
 	    }
-	    set lastApo to ship:apoapsis.
+	    //set moreCircular to choose true if ship:orbit:eccentricity >  lastE else false.
+	    //set lastE to ship:orbit:eccentricity.
 }).
 states:add(state_orbit, { // 12: Orbit!
 		set tickDelay to .1.

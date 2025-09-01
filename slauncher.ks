@@ -2,122 +2,136 @@ clearscreen.
 
 run utils.
 
-declare parameter orbitAltKm to 100.
-declare parameter rollAngle to 90.
-declare parameter manageMaxQ to true.
-declare parameter secondarySafetyAlt to 2000.
-declare parameter inFlight to false.
 
-declare parameter initialState to "PRE-LAUNCH".
+// Flight configuration parameters
+declare parameter orbitAltKm to 100.     
+declare parameter inclination to 0.
+declare parameter manageMaxQ to true.       // Throttle back during max Q
+declare parameter secondarySafetyAlt to 2000. // Initial climb altitude
+declare parameter inFlight to false.        // Whether we're starting mid-flight
 
-SET orbitAlt TO orbitAltKm * 1000.
-set orbitV to getCOV(orbitAlt).
-set safetyAlt to 300.
+run launcher_display.
+// Convert units and calculate orbital parameters
+set orbitAlt to orbitAltKm * 1000.         // Convert km to meters
+set orbitV to getCOV(orbitAlt).            // Calculate target orbital velocity
+set safetyAlt to 300.                      // Initial pad clearance altitude
 
-sas off.
+// Calculate launch azimuth
+
+set launchAzimuth to inclination.
+
+// Initialize flight controls
+sas off.                                   // Disable SAS for script control
 set targetThrottle to 0.
 lock throttle to targetThrottle.
-set targetSteering to up + r(0, 0, rollAngle).
+set targetSteering to heading(launchAzimuth, 90). // Point straight up initially
 lock steering to targetSteering.
 
-set targetPitch to "x".
+// State machine configuration
+local function initializeStates {
+    return lexicon(
+        // Pre-launch and initial ascent
+        "PRE-LAUNCH", "PRE-LAUNCH",
+        "LAUNCH", "LAUNCH",
+        "PAD_ROLL", "PAD ROLL",
+        "CLIMB_2", "CLIMB TO 2 KM",
+        
+        // Gravity turn and atmospheric ascent
+        "TURN_10", "TURN TO 10 KM",
+        "CLIMB_18", "CLIMB TO 18 KM",
+        "TURN_45", "TURN TO 45 KM",
+        
+        // Coast and orbital insertion
+        "PREPARE_COAST", "PREPARE TO COAST",
+        "ADJUST_APO", "ADJUST APOAPSIS",
+        "COAST_SPACE", "COAST TO SPACE",
+        "COAST_APO", "COAST TO APO",
+        "PREPARE_CIRC", "PREPARE TO CIRCULARIIZE",
+        "CIRC", "CIRCULARIIZE",
+        "ORBIT", "ORBIT"
+    ).
+}
 
-
+// Initialize state machine
+set stateNames to initializeStates().
+set state to choose stateNames["CLIMB_2"] if inFlight else stateNames["PRE-LAUNCH"].
 set orbiting to false.
-set stateNames to lexicon().
-set state_preLaunch to "PRE-LAUNCH".
-set state_launch to "LAUNCH".
-set state_padRoll to "PAD ROLL".
-set state_climb2 to "CLIMB TO 2 KM".
-set state_turn10 to "TURN TO 10 KM".
-set state_climb18 to "CLIMB TO 18 KM".
-set state_turn_45 to "TURN TO 45 KM".
-set state_prepareCoast to "PREPARE TO COAST".
-set state_adjustApo to "ADJUST APOAPSIS".
-set state_coastToSpace to "COAST TO SPACE".
-set state_coastToApo to "C".
-set state_prepareCirc to "PREPARE TO CIRCULARIIZE".
-set state_circ to "CIRCULARIIZE".
-set state_orbit to "ORBIT".
+set tickDelay to 0.01.                     // Main loop delay
+set once to false.                         // State entry flag
 
-set state to choose state_climb2 if inFlight else state_preLaunch.
-set tickDelay to .01.
-set once to false.
-
-run launcher_utils.
-run launcher_display.
+// Initialize display
 updateDisplay().
 
 set states to lexicon().
-states:add(state_preLaunch, {
+states:add(stateNames["PRE-LAUNCH"], {
 		from { local countdown is 5. } until countdown = 0 step { set countdown to countdown - 1. } do {
-			updateInfo("Launching to " + orbitAltKm + "km orbit in " + countdown).
+			updateInfo("Launching to " + orbitAltKm + "km orbit at " + "in "+ countdown).
 			wait 1.
 		}
 		set targetThrottle to 1.
-		set targetSteering to up + r(0, 0, rollAngle).
-		set state to state_launch.
+		set targetSteering to heading(launchAzimuth, 90).
+		set state to stateNames["LAUNCH"].
 }).
-states:add(state_launch, { updateInfo("Launching"). stage. set state to state_padRoll. }).
-states:add(state_padRoll, { // 2: pad roll
+states:add(stateNames["LAUNCH"], { updateInfo("Launching"). stage. set state to stateNames["PAD_ROLL"]. }).
+states:add(stateNames["PAD_ROLL"], { // 2: pad roll
 		if ship:altitude > safetyAlt {
-			updateInfo("Rolling away from pad").
+			updateInfo("Beginning gravity turn").
 			if gear { gear off. }
-			set targetSteering to up + r(0, -5, rollAngle).
-			set state to state_climb2.
+			set targetSteering to heading(launchAzimuth, 85).
+			set state to stateNames["CLIMB_2"].
 		}
 }).
-states:add(state_climb2, { // 3: climb to 2km
+states:add(stateNames["CLIMB_2"], { // 3: climb to 2km
 		autostage().
 		if not once and ship:altitude > 200 { set once to true. updateInfo("Climbing to " + secondarySafetyAlt + "m"). }
-		if ship:altitude > secondarySafetyAlt { set state to state_turn10. set once to false. }
+		if ship:altitude > secondarySafetyAlt { set state to stateNames["TURN_10"]. set once to false. }
 }).
-states:add(state_turn10, {
+states:add(stateNames["TURN_10"], {
 		autostage().
 		if not once { set once to true. updateInfo("Turning to 45 degrees at 10km"). }
 		
-		set targetPitch to -1 * (90 - min(85, round(90 - (alt:radar/10000 * 45)))).
-		set targetSteering to up + r(0, targetPitch, rollAngle).
+		set targetPitch to max(5, 90 - (alt:radar/10000 * 45)).
+		set targetSteering to heading(launchAzimuth, targetPitch).
 		
 		if ship:altitude > 5000 and manageMaxQ { updateInfo("Throttling back through max q"). lock throttle to .7. }
 		
 		if ship:altitude > 10000 {
 			if manageMaxQ { updateInfo("Throttling up"). }
 			lock throttle to 1.
-			set state to state_climb18.
+			set state to stateNames["CLIMB_18"].
 			set once to false.
 		}
 }).
-states:add(state_climb18, { // 5: climb to 18km
+states:add(stateNames["CLIMB_18"], { // 5: climb to 18km
 		autostage().
 		if not once and ship:altitude > 11000 { set once to true. updateInfo("Climbing to 18km"). }
 		
-		set targetSteering to up + r(0, -45, rollAngle).
+		set targetSteering to heading(launchAzimuth, 45).
 		
-		if ship:altitude > 18000 { set state to state_turn_45. set once to false. }
+		if ship:altitude > 18000 { set state to stateNames["TURN_45"]. set once to false. }
 }).
-states:add(state_turn_45, { // 6: turn to 45km
+states:add(stateNames["TURN_45"], { // 6: turn to 45km
 		autostage().
 		if not once { set once to true. updateInfo("Turning to 5 degrees at 45km"). }
 		
-		set targetPitch TO -1 * (90 - max(5, round(45 - ((alt:radar-18000)/(45000-18000) * 45)))).
-		set targetSteering to up + r(0, targetPitch, rollAngle).
+		set targetPitch to max(5, 45 - ((alt:radar-18000)/(45000-18000) * 45)).
+		set targetSteering to heading(launchAzimuth, targetPitch).
 		
 		if ship:apoapsis > orbitAlt {
-			set state to state_prepareCoast.
+			set state to stateNames["PREPARE_COAST"].
 			set once to false.
 		}
 		else if ship:apoapsis > orbitAlt * .995 { lock throttle to .05. }
 		else if ship:apoapsis > orbitAlt * .95 { lock throttle to .25. }
 }).
-states:add(state_prepareCoast, { // 7: Prepare to coast
-		updateInfo("Peparing to coast").
+states:add(stateNames["PREPARE_COAST"], { // 7: Prepare to coast
+		updateInfo("Preparing to coast").
 		lock throttle to 0. wait 1.
-		set targetSteering to up + r(0, -87, rollAngle).
+		set targetSteering to heading(launchAzimuth, 3). // Almost horizontal
 		wait 3.
-		set state to state_coastToSpace.
+		set state to stateNames["COAST_SPACE"].
 }).
-states:add(state_adjustApo, { // 8: Adjust apoapsis
+states:add(stateNames["ADJUST_APO"], { // 8: Adjust apoapsis
 		if not once {
 			set once to true.
 			updateInfo("Adjusting apoapsis").
@@ -125,61 +139,96 @@ states:add(state_adjustApo, { // 8: Adjust apoapsis
 		}
 		if ship:apoapsis > orbitAlt * 1.002 { 
 			lock throttle to 0. 
-			set state to state_coastToSpace.
+			set state to stateNames["COAST_SPACE"].
 			set once to false.
 		}
 }).
-states:add(state_coastToSpace, {
+states:add(stateNames["COAST_SPACE"], {
 		if not once { set once to true. updateInfo("Coasting to space"). }
-		set targetSteering to up + r(0, -87, rollAngle).
-		if ship:apoapsis < orbitAlt * .999 { set state to state_adjustApo. set once to false. }
-		if ship:altitude > 70000 { set state to state_coastToApo. set once to false. }
+		set targetSteering to heading(launchAzimuth, 3).
+		if ship:apoapsis < orbitAlt * .999 { set state to stateNames["ADJUST_APO"]. set once to false. }
+		if ship:altitude > 70000 { set state to stateNames["COAST_APO"]. set once to false. }
 }).
-states:add(state_coastToApo, {
+states:add(stateNames["COAST_APO"], {
 	if not once {
 		set tickDelay to 1. set once to true.
 		updateInfo("Coasting to apoapsis").
 		panels on.
 		lights on.
+		run ant.
 		set deltaV to abs((getCOV(ship:apoapsis) - getApoV())).
 		set burnTime to deltaV / getA().
 	}
-	set targetSteering to up + r(0, -90, rollAngle).
-	if (eta:apoapsis - (burnTime / 2)) <  60 {
-		set state to state_prepareCirc. set once to false.
+	// Point prograde for circularization
+	lock targetSteering to prograde.
+	if (eta:apoapsis - (burnTime / 2)) < 60 {
+		set state to stateNames["PREPARE_CIRC"]. set once to false.
 	}
 }).
-states:add(state_prepareCirc, {
+states:add(stateNames["PREPARE_CIRC"], {
 		if not once {
 			set tickDelay to .1.
 			updateInfo("Preparing to circularize").
 			set once to true.
 		}
-		updateinfo( round(burnTime) + " s + " + round(deltaV) + "m/s burn in  " + round(eta:apoapsis - ((2 * burnTime) / 3)) + " seconds").
-		set targetSteering to up + r(0, -90, rollAngle).
+		updateinfo(round(burnTime) + " s + " + round(deltaV) + "m/s burn in " + round(eta:apoapsis - ((2 * burnTime) / 3)) + " seconds").
+		// Point prograde for circularization
+		lock targetSteering to prograde.
 		if eta:apoapsis < ((2 * burnTime) / 3) {
-			set state to state_circ. set once to false.
+			set state to stateNames["CIRC"]. set once to false.
 		}
 }).
-states:add(state_circ, { // 11: Circularize
+states:add(stateNames["CIRC"], { // 11: Circularize
 		if not once {
 			set once to true.
 			set tickDelay to .01.
 			updateInfo("Circularizing").
 			lock throttle to 1.
-			//set lastE to ship:orbit:eccentricity.
-			//set moreCircular to true.
+			// Store initial apoapsis for adaptive steering
+			set initialApoapsis to ship:apoapsis.
+			set burnStartTime to missionTime.
 		}
-		set targetSteering to up + r(0, -90, rollAngle).
+		// Adaptive steering for finite burns
+		autostage().
+		
+		// Calculate how much of the burn has completed
+		set elapsedBurnTime to missionTime - burnStartTime.
+		set burnProgress to elapsedBurnTime / burnTime.
+		
+		// For long burns, gradually adjust steering to compensate for apoapsis movement
+		if burnTime > 30 { // Only use adaptive steering for burns longer than 30 seconds
+			// Calculate how much the apoapsis has moved
+			set apoapsisShift to ship:apoapsis - initialApoapsis.
+			
+			// If apoapsis has moved significantly, adjust steering
+			if abs(apoapsisShift) > 1000 { // More than 1km shift
+				// Calculate compensation angle (simplified)
+				set compensationAngle to (apoapsisShift / 10000) * 5. // 5 degrees per 10km shift
+				set compensationAngle to max(-10, min(10, compensationAngle)). // Limit to ±10 degrees
+				
+				// Apply compensation by adjusting pitch slightly above prograde
+				set targetPitch to 90 + compensationAngle.
+				set targetSteering to heading(launchAzimuth, targetPitch).
+			} else {
+				// Use standard prograde steering
+				lock targetSteering to prograde.
+			}
+		} else if burnTime > 60 { // Alternative: For very long burns (>60s), burn horizontal
+			// Burn towards 0° (horizontal) to minimize apoapsis movement
+			// This can be more effective for very low TWR stages
+			set targetSteering to heading(launchAzimuth, 0).
+		} else {
+			// Use standard prograde steering
+			lock targetSteering to prograde.
+		}
+		
 		if ship:periapsis > ship:apoapsis * .75 { lock throttle to .1. }
 		if ship:periapsis > ship:apoapsis * .95 { lock throttle to .05. }
 		if ship:periapsis > orbitAlt * .95 and ship:apoapsis > orbitAlt * 1.05 {
-		  	set state to state_orbit. set once to false.
-	    }
-	    //set moreCircular to choose true if ship:orbit:eccentricity >  lastE else false.
-	    //set lastE to ship:orbit:eccentricity.
+			set state to stateNames["ORBIT"]. set once to false.
+		}
 }).
-states:add(state_orbit, { // 12: Orbit!
+states:add(stateNames["ORBIT"], { // 12: Orbit!
 		set tickDelay to .1.
 		lock throttle to 0.
 		updateInfo("Orbiting!").

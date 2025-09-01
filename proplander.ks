@@ -9,8 +9,7 @@ run utils.
 
 lock surfaceAlt to ROUND(MAX(0.001, GEOPOSITION:TERRAINHEIGHT), 3).
 lock shipAlt to ROUND(MAX(0.001, ALTITUDE-GEOPOSITION:TERRAINHEIGHT) - shipHeight, 3).
-lock burnAlt to getBurnAlt(surfaceAlt).
-
+lock burnAlt to getBurnAlt(shipAlt, descentV).
 
 set landingV to -.1.
 set thrust to ship:maxThrust.
@@ -20,11 +19,11 @@ lock descentV to ship:verticalSpeed.
 
 lock deltaV to (landingV - descentV).
 lock timeToBurn to ((burnAlt - shipAlt) / descentV).
-lock neutralThrust to ((ship:mass*g) / thrust).
+lock neutralThrust to ((ship:mass * abs(gravity())) / thrust).
 set delayTick to .1.
 
 set throttleValue to 0.
-function updateThrottle { lock throttle to trottleValue. }
+function updateThrottle { lock throttle to throttleValue. }
 set steeringValue to Heading(90, 90).
 function updateSteering { lock steering to steeringValue. }
 
@@ -113,16 +112,29 @@ states:add(state_landing, {
 	if not once { gear on. set once to true. }
 	local land to false.
 	set steeringValue to up.
-	set throttleValue to neutralThrust.
-	//if deltaV > 0 { set throttleValue to neutralThrust + .1. }
-	if deltaV < 0 { set throttleValue to neutralThrust - .1. }
-	if shipAlt < .5 { set land to true. set throttleValue to 0. }
+	
+	// Improved throttle control during landing
+	if deltaV > 0.1 { 
+		set throttleValue to neutralThrust + 0.1. 
+	} else if deltaV < -0.1 { 
+		set throttleValue to neutralThrust - 0.1. 
+	} else {
+		set throttleValue to neutralThrust.
+	}
+	
+	if shipAlt < .5 { 
+		set land to true. 
+		set throttleValue to 0. 
+	}
+	
 	lock steering to steeringValue.
 	lock throttle to throttleValue.
+	
 	if land {
 		set state to state_landed.
 		set delayTick to .1.
-		set once to false. }
+		set once to false. 
+	}
 }).
 
 until state = state_landed {
@@ -131,6 +143,19 @@ until state = state_landed {
 	set lastAlt to shipAlt.
 
 	set g to -gravity().
+
+	// Add error checking for critical conditions
+	if shipAlt < 0 {
+		set info to "ERROR: Negative altitude detected!".
+		set state to state_landed.
+		break.
+	}
+	
+	if ship:mass <= 0 {
+		set info to "ERROR: No mass detected!".
+		set state to state_landed.
+		break.
+	}
 
 	states[state]().
 

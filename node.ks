@@ -67,23 +67,24 @@ states:add(state_burn, {
 	set targetSteering to nextnode:deltav.
 	set accel to thrust / ship:mass.
 	set targetThrottle to min(1, nextnode:deltav:mag / accel).
+	lock throttle to targetThrottle.
 
 	if nextnode:deltav:mag < 1 {
-		//lock throttle to 0.
 		set state to state_finalize.
 		set once to false.
 	}
 	if (doautostage) { autostage(). }
-	updateInfo(vdot(initalDv, nextnode:deltav)).
+	updateInfo("Remaining dV: " + round(nextnode:deltav:mag, 1) + "m/s").
 }).
 states:add(state_finalize, {
 	if not once {
 		updateInfo("Finishing touches").
 		set once to true.
 		set targetThrottle to .01.
+		lock throttle to targetThrottle.
 	}
 	set targetSteering to nextnode:deltav.
-	if vdot(initalDv, nextnode:deltav) < 0 {
+	if nextnode:deltav:mag < 0.1 {
 		updateInfo("Burn complete!").
 		set state to state_complete.
 		lock throttle to 0.

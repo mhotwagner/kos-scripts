@@ -67,4 +67,3 @@ if encounter = tgtbody:name {
     print "T+" + round(missiontime) + " WARNING! No encounter found.".
     remove nd.
 }
-    }

@@ -7,8 +7,14 @@ run utils.
 declare parameter orbitAltKm to 100.     
 declare parameter inclination to 0.
 declare parameter manageMaxQ to true.       // Throttle back during max Q
-declare parameter secondarySafetyAlt to 2000. // Initial climb altitude
-declare parameter inFlight to false.        // Whether we're starting mid-flight
+declare parameter boostbackStage to 0.
+declare parameter boostbackDeltaV to 500.
+declare parameter boostbackStage2 to 0.
+declare parameter boostbackDeltaV2 to 500.
+// declare parameter inFlight to false.        // Whether we're starting mid-flight
+
+set inFlight to ship:altitude > 500.
+set secondarySafetyAlt to 2000.
 
 run launcher_display.
 // Convert units and calculate orbital parameters
@@ -26,6 +32,47 @@ set targetThrottle to 0.
 lock throttle to targetThrottle.
 set targetSteering to heading(launchAzimuth, 90). // Point straight up initially
 lock steering to targetSteering.
+
+function checkBoostback {
+
+	if boostbackStage > 0 {
+		if stage:number = boostbackStage {
+			if SHIP:STAGEDELTAV(SHIP:STAGENUM):CURRENT <= boostbackDeltaV {
+				lock throttle to 0.
+				stage.
+				wait 2.
+				lock throttle to 1.
+				return true.
+			}
+		}
+	} else if boostbackStage2 > 0 {
+		if stage:number = boostbackStage2 {
+			if SHIP:STAGEDELTAV(SHIP:STAGENUM):CURRENT <= boostbackDeltaV2 {
+				stage.
+				wait 2.
+				return true.
+			}
+		}
+	}
+
+	return false.
+}
+
+function hasMainFairing {
+	set fl to ship:partsdubbed("mainFairing").
+	if fl:length > 0 {
+		return true.
+	}
+	return false.
+}
+
+function blowFairing {
+	set fairingList to ship:partsdubbed("mainFairing").
+	for fairing in fairingList {
+		set m to fairing:getmodule("ModuleProceduralFairing").
+		m:doevent("deploy").
+	}
+}
 
 // State machine configuration
 local function initializeStates {
@@ -82,12 +129,12 @@ states:add(stateNames["PAD_ROLL"], { // 2: pad roll
 		}
 }).
 states:add(stateNames["CLIMB_2"], { // 3: climb to 2km
-		autostage().
+		if not checkBoostback() { autostage(). }
 		if not once and ship:altitude > 200 { set once to true. updateInfo("Climbing to " + secondarySafetyAlt + "m"). }
 		if ship:altitude > secondarySafetyAlt { set state to stateNames["TURN_10"]. set once to false. }
 }).
 states:add(stateNames["TURN_10"], {
-		autostage().
+		if not checkBoostback() { autostage(). }
 		if not once { set once to true. updateInfo("Turning to 45 degrees at 10km"). }
 		
 		set targetPitch to max(5, 90 - (alt:radar/10000 * 45)).
@@ -103,7 +150,7 @@ states:add(stateNames["TURN_10"], {
 		}
 }).
 states:add(stateNames["CLIMB_18"], { // 5: climb to 18km
-		autostage().
+		if not checkBoostback() { autostage(). }
 		if not once and ship:altitude > 11000 { set once to true. updateInfo("Climbing to 18km"). }
 		
 		set targetSteering to heading(launchAzimuth, 45).
@@ -111,7 +158,7 @@ states:add(stateNames["CLIMB_18"], { // 5: climb to 18km
 		if ship:altitude > 18000 { set state to stateNames["TURN_45"]. set once to false. }
 }).
 states:add(stateNames["TURN_45"], { // 6: turn to 45km
-		autostage().
+		if not checkBoostback() { autostage(). }
 		if not once { set once to true. updateInfo("Turning to 5 degrees at 45km"). }
 		
 		set targetPitch to max(5, 45 - ((alt:radar-18000)/(45000-18000) * 45)).
@@ -153,6 +200,7 @@ states:add(stateNames["COAST_APO"], {
 	if not once {
 		set tickDelay to 1. set once to true.
 		updateInfo("Coasting to apoapsis").
+		if hasMainFairing() { blowFairing(). wait 5. }
 		panels on.
 		lights on.
 		run ant.
@@ -189,7 +237,7 @@ states:add(stateNames["CIRC"], { // 11: Circularize
 			set burnStartTime to missionTime.
 		}
 		// Adaptive steering for finite burns
-		autostage().
+		if not checkBoostback() { autostage(). }
 		
 		// Calculate how much of the burn has completed
 		set elapsedBurnTime to missionTime - burnStartTime.

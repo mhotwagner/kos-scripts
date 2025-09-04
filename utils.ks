@@ -87,26 +87,46 @@ function autostage {
 		if maxthrust = 0 { set shouldStage to true. }
 		list engines in engines. 
 		for engine in engines  { if engine:flameout { set shouldStage to true. break. } }
-		if shouldStage { updateInfo("Staging"). stage. wait .5. }
+		if shouldStage { 
+			updateInfo("Staging"). stage. wait .5.
+			return true.
+		} else {
+			return false.
+		}
 	}
 }
+
 
 function getBurnAlt {
     local parameter __currentAlt is 0.
     local parameter __verticalSpeed is 0.
-    local parameter __maxDeceleration is 9.81.  // Default to 1G deceleration
+    
+    // Calculate actual ship deceleration capability
+    local __shipMass to ship:mass.
+    local __maxThrust to ship:maxThrust.
+    local __gravity to abs(gravity()).
+    
+    // Calculate maximum deceleration (thrust - gravity)
+    local __maxDeceleration to (__maxThrust / __shipMass) - __gravity.
+    
+    // Ensure we have positive deceleration capability
+    if __maxDeceleration <= 0 {
+        // If we can't decelerate, return current altitude as warning
+        return __currentAlt.
+    }
     
     // Calculate the altitude needed to decelerate to 0 m/s
     // Using the equation: h = v² / (2a)
-    // where:
-    // h = height needed
-    // v = current vertical speed
-    // a = deceleration rate
-    
     local __burnAlt to (__verticalSpeed^2) / (2 * __maxDeceleration).
     
-    // Add a safety margin (20%)
-    set __burnAlt to __burnAlt * 1.2.
+    // Add a larger safety margin (50%) for reliability
+    set __burnAlt to __burnAlt * 1.5.
+    
+    // Add minimum burn altitude to account for engine spool-up and control lag
+    local __minBurnAlt to 100.
+    if __burnAlt < __minBurnAlt {
+        set __burnAlt to __minBurnAlt.
+    }
     
     // Ensure we don't return a value higher than current altitude
     if __burnAlt > __currentAlt {

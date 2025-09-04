@@ -1,9 +1,11 @@
 clearscreen.
 
 declare parameter doautostage to false.
+declare parameter maxAutoStage to 0.
 
 set thrust to ship:maxThrust.
 set accel to thrust / ship:mass.
+if accel = 0 { set accel to .01. }
 set burnTime to nextnode:deltav:mag / accel.
 
 set targetSteering to nextnode:deltav.
@@ -66,6 +68,7 @@ states:add(state_burn, {
 	}
 	set targetSteering to nextnode:deltav.
 	set accel to thrust / ship:mass.
+	if accel = 0 { set accel to .01. }
 	set targetThrottle to min(1, nextnode:deltav:mag / accel).
 	lock throttle to targetThrottle.
 
@@ -73,7 +76,7 @@ states:add(state_burn, {
 		set state to state_finalize.
 		set once to false.
 	}
-	if (doautostage) { autostage(). }
+	if (doautostage and stage:number > maxAutoStage) { autostage(). }
 	updateInfo("Remaining dV: " + round(nextnode:deltav:mag, 1) + "m/s").
 }).
 states:add(state_finalize, {

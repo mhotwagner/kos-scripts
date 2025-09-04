@@ -11,7 +11,7 @@ lock surfaceAlt to ROUND(MAX(0.001, GEOPOSITION:TERRAINHEIGHT), 3).
 lock shipAlt to ROUND(MAX(0.001, ALTITUDE-GEOPOSITION:TERRAINHEIGHT) - shipHeight, 3).
 lock burnAlt to getBurnAlt(shipAlt, descentV).
 
-set landingV to -.1.
+set landingV to .5.
 set thrust to ship:maxThrust.
 set descentCounter to 0.
 
@@ -71,7 +71,7 @@ states:add(state_tracking_low, {
 	if not once {
 		if atmoPresent {
 			set info to "Falling through atmo".
-		}. else { set info to "Falling toward the surface". }
+		} else { set info to "Falling toward the surface". }
 		set once to true.
 	}
 	if shipAlt > atmoHeight or shipAlt < terminalHeight + 1 { set state to state_tracking. set once to false. }

@@ -87,13 +87,14 @@ states:add(state_burn, {
 		//}.
 	}
 	set steeringValue to srfretrograde.
-	if shipAlt < burnAlt + 2 {
+	if shipAlt < burnAlt + 1 {
 		set info to "Burning".
 		set throttleValue to 1.
 	} else { set throttleValue to 0. set info to "Falling". }
-	if descentV > -15 { set steeringValue to up. }
+	if descentV > -15 { set steeringValue to up. set throttleValue to max(neutralThrust, descentV / -15). }
 	if descentV > -1 {
 		set delayTick to .01.
+		set throttleValue to neutralThrust.
 		set info to "Touching down".
 		set state to state_landing.
 		set once to false.
@@ -114,16 +115,31 @@ states:add(state_landing, {
 	set steeringValue to up.
 	
 	// Improved throttle control during landing
-	if deltaV > 0.1 { 
-		set throttleValue to neutralThrust + 0.1. 
-	} else if deltaV < -0.1 { 
-		set throttleValue to neutralThrust - 0.1. 
+	// deltaV = landingV - descentV, so positive deltaV means we're descending too fast
+	if shipAlt > 50 {
+		if deltaV > 1 {
+			set throttleValue to neutralThrust + 0.05.
+		} else if deltaV < 0 { 
+			// Descending too slow or ascending, decrease throttle
+			set throttleValue to 0.
+		} else {
+			set throttleValue to neutralThrust.
+		}
 	} else {
-		set throttleValue to neutralThrust.
+		if deltaV > .1 {
+			set throttleValue to neutralThrust + 0.05.
+		} else if deltaV < 0 { 
+			set throttleValue to 0.
+		} else {
+			set throttleValue to neutralThrust.
+		}
 	}
+
+	// if ship:horizontalSpeed > 1 {
 	
 	if shipAlt < .5 { 
-		set land to true. 
+		set steeringValue to up.
+		set land to true.
 		set throttleValue to 0. 
 	}
 	
